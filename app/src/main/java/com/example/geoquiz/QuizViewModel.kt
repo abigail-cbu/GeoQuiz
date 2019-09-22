@@ -4,9 +4,15 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 
 private const val TAG = "QuizViewModel"
+private const val TOKENS = 3
 
 class QuizViewModel : ViewModel() {
     var currentIndex = 0
+    //var isCheater = false
+
+    var cheaterAnswer = false
+
+    var cheatTokens = TOKENS
 
     private var numOfCorrect : Double = 0.0
 
@@ -27,6 +33,10 @@ class QuizViewModel : ViewModel() {
 
     val currentQuestionText: Int
         get() = questionBank[currentIndex].textResId
+
+    // Ch. 6: Tracking cheat status by question
+    val currentQuestionCheated: Boolean
+        get() = questionBank[currentIndex].cheated
 
     val size: Number
         get() = questionBank.size
@@ -60,5 +70,10 @@ class QuizViewModel : ViewModel() {
 //            //grade = numOfCorrect.toBigDecimal()
             Log.d(TAG, "numOfCorrect: " + numOfCorrect)
         }
+    }
+
+    fun setCheated(cheated: Boolean) {
+        questionBank[currentIndex].cheated = cheated
+        cheatTokens--
     }
 }

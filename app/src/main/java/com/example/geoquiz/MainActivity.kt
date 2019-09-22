@@ -1,5 +1,10 @@
 package com.example.geoquiz
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.app.ActivityOptions
+import android.content.Intent
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -10,6 +15,7 @@ import androidx.lifecycle.ViewModelProviders
 
 private const val TAG = "MainActivity"
 private const val KEY_INDEX = "index"
+private const val REQUEST_CODE_CHEAT = 0
 
 class MainActivity : AppCompatActivity() {
 
@@ -18,12 +24,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var falseButton: Button
     private lateinit var nextButton: ImageButton // Ch. 2 Challenge: Button --> ImageButton
     private lateinit var prevButton: ImageButton
+    private lateinit var cheatButton: Button
     private lateinit var questionTextView: TextView
+    private lateinit var cheatTokenTextView: TextView
 
     private val quizViewModel: QuizViewModel by lazy {
         ViewModelProviders.of(this).get(QuizViewModel::class.java)
     }
 
+    @SuppressLint("RestrictedApi")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "onCreate(Bundle?) called")
@@ -32,11 +41,13 @@ class MainActivity : AppCompatActivity() {
         val currentIndex = savedInstanceState?.getInt(KEY_INDEX, 0) ?: 0
         quizViewModel.currentIndex = currentIndex
 
-        trueButton = findViewById(R.id.true_button)
-        falseButton = findViewById(R.id.false_button)
-        nextButton = findViewById(R.id.next_button)
-        prevButton = findViewById(R.id.prev_button)
-        questionTextView = findViewById(R.id.question_text_view)
+        trueButton          = findViewById(R.id.true_button)
+        falseButton         = findViewById(R.id.false_button)
+        nextButton          = findViewById(R.id.next_button)
+        prevButton          = findViewById(R.id.prev_button)
+        cheatButton         = findViewById(R.id.cheat_button)
+        questionTextView    = findViewById(R.id.question_text_view)
+        cheatTokenTextView  = findViewById(R.id.cheat_token_text_view)
 
         trueButton.setOnClickListener { view: View ->
             checkAnswer(true)
@@ -64,8 +75,39 @@ class MainActivity : AppCompatActivity() {
             updateQuestion()
         }
 
-        updateQuestion()
+        cheatButton.setOnClickListener { view ->
+            // Start Cheat Activity
+            val answerIsTrue = quizViewModel.currentQuestionAnswer
+            val intent = CheatActivity.newIntent(this@MainActivity, answerIsTrue)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
 
+                val options =
+                    ActivityOptions.makeClipRevealAnimation(view, 0, 0, view.width, view.height)
+                startActivityForResult(intent, REQUEST_CODE_CHEAT, options.toBundle())
+            }
+            else {
+                startActivityForResult(intent, REQUEST_CODE_CHEAT)
+            }
+        }
+
+        updateQuestion()
+        setCheatTokens()
+
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (resultCode != Activity.RESULT_OK) {
+            return
+        }
+
+        if (requestCode == REQUEST_CODE_CHEAT) {
+            // Ch. 6: Tracking cheat status by question
+            quizViewModel.setCheated(data?.getBooleanExtra(EXTRA_ANSWER_SHOWN, false) ?: false)
+        }
+
+        setCheatTokens()
     }
 
     override fun onStart() {
@@ -111,12 +153,19 @@ class MainActivity : AppCompatActivity() {
 
         quizViewModel.setQuestion(userAnswer == correctAnswer) // Ch. 3: Prevent Repeat Answers
 
-        val messageResId =
-            if (userAnswer == correctAnswer) {
-                R.string.correct_toast
-            } else {
-                R.string.incorrect_toast
-            }
+//        val messageResId =
+//            if (userAnswer == correctAnswer) {
+//                R.string.correct_toast
+//            } else {
+//                R.string.incorrect_toast
+//            }
+
+        val messageResId = when {
+            quizViewModel.currentQuestionCheated -> R.string.judgment_toast
+            userAnswer == correctAnswer -> R.string.correct_toast
+            else -> R.string.incorrect_toast
+        }
+
         val toast = Toast.makeText(this, messageResId, Toast.LENGTH_SHORT)
         toast.setGravity(Gravity.TOP, 0, 0) // CH. 1 Challenge
         toast.show()
@@ -139,6 +188,15 @@ class MainActivity : AppCompatActivity() {
         var message = "Grade: " + quizViewModel.grade.toString() + "%"
         val toast = Toast.makeText(this, message, Toast.LENGTH_SHORT)
         toast.show()
+
+    }
+
+    // Ch. 7: Limited Cheats
+    private fun setCheatTokens() {
+        var tokenText = "Cheat Tokens Remaining: " + quizViewModel.cheatTokens.toString()
+        cheatTokenTextView.setText(tokenText)
+
+        cheatButton.isEnabled = quizViewModel.cheatTokens > 0
 
     }
 }
